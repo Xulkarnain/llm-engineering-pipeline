@@ -1,0 +1,1562 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/Xulkarnain/llm-engineering-pipeline/blob/main/llm-engineering\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 1. Introduction to Hugging Face Hub\n",
+        "\n",
+        "## What is Hugging Face Hub?\n",
+        "\n",
+        "Hugging Face Hub is a centralized platform for hosting, discovering, sharing and managing machine learning resources.\n",
+        "\n",
+        "It provides repositories containing:\n",
+        "\n",
+        "- Pretrained models\n",
+        "- Tokenizers\n",
+        "- Datasets\n",
+        "- Model configurations\n",
+        "- Fine-tuned models\n",
+        "- Model documentation and metadata\n",
+        "\n",
+        "It provides a standardized ecosystem for working with different machine learning architectures.\n",
+        "\n",
+        "## Why do we use Hugging Face Hub?\n",
+        "\n",
+        "Instead of manually downloading model weights, writing architecture-specific loading code and configuring tokenizers, we can use the Hugging Face ecosystem to access these resources through standardized APIs.\n",
+        "\n",
+        "For example, we can load different compatible language models using:\n",
+        "\n",
+        "- AutoTokenizer\n",
+        "- AutoConfig\n",
+        "- AutoModel\n",
+        "- AutoModelForCausalLM\n",
+        "\n",
+        "## Important components\n",
+        "\n",
+        "1. **Hugging Face Hub:** Hosts model and dataset repositories.\n",
+        "2. **Hugging Face Hub Python library:** Provides APIs to search, inspect and download repository contents.\n",
+        "3. **Transformers:** Provides model architectures, tokenizers and training/inference utilities.\n",
+        "4. **Datasets:** Provides tools to load and process datasets.\n",
+        "5. **PEFT:** Provides parameter-efficient fine-tuning techniques such as LoRA.\n",
+        "\n",
+        "## Important distinction\n",
+        "\n",
+        "Hugging Face Hub and Transformers are not the same thing.\n",
+        "\n",
+        "- Hub is the platform and repository infrastructure.\n",
+        "- Transformers is the Python library used to work with models and tokenizers.\n",
+        "\n",
+        "The Hub can host models that do not use Transformers, and Transformers can also load models from local directories.\n",
+        ":::"
+      ],
+      "metadata": {
+        "id": "Gw53cLl0diFs"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import cuda\n",
+        "import torch\n",
+        "\n",
+        "torch.cuda.is_available()"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "wFR5jhO4dhnV",
+        "outputId": "a120090b-8516-41e6-9eff-8eb83215f7ef"
+      },
+      "execution_count": 1,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "True"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 1
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "torch.cuda.get_device_name(0)"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 36
+        },
+        "id": "gQ_6py0-eGx7",
+        "outputId": "9dab2ad5-37f2-47ea-8b7c-a8474e0bc450"
+      },
+      "execution_count": 2,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "'Tesla T4'"
+            ],
+            "application/vnd.google.colaboratory.intrinsic+json": {
+              "type": "string"
+            }
+          },
+          "metadata": {},
+          "execution_count": 2
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 2. Understanding Model Repository IDs\n",
+        "\n",
+        "A Hugging Face model repository ID uniquely identifies a model repository on the Hub.\n",
+        "\n",
+        "General format:\n",
+        "\n",
+        "`organization_or_username/model_name`\n",
+        "\n",
+        "Examples:\n",
+        "\n",
+        "- `Qwen/Qwen2.5-0.5B-Instruct`\n",
+        "- `google/flan-t5-base`\n",
+        "- `openai-community/gpt2`\n",
+        "\n",
+        "A model repository ID is used by Hub and Transformers functions to identify the model whose files or metadata we want to access.\n",
+        "\n",
+        "## Important considerations\n",
+        "\n",
+        "- Repository IDs are case-sensitive identifiers in practice; use the exact ID provided by the Hub.\n",
+        "- Some repositories are public, while others require authentication or permission.\n",
+        "- A repository can contain multiple model files and configuration files.\n",
+        "- A repository can contain multiple branches and revisions.\n",
+        "- A model may require a specific Transformers version or custom code.\n",
+        "\n",
+        "**Best practice:** Always inspect the model card, architecture, license and supported tasks before using a model in a project.\n",
+        ":::"
+      ],
+      "metadata": {
+        "id": "LuXha1s_f28e"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 3. Connecting to Hugging Face Hub\n",
+        "\n",
+        "The `huggingface_hub` Python library provides programmatic access to the Hugging Face Hub.\n",
+        "\n",
+        "The main interface for interacting with the Hub is `HfApi`.\n",
+        "\n",
+        "## Important classes and functions\n",
+        "\n",
+        "- `HfApi`: Main API client for interacting with Hub repositories.\n",
+        "- `model_info()`: Retrieves metadata about a model repository.\n",
+        "- `list_models()`: Searches and lists available models.\n",
+        "- `list_repo_files()`: Lists files inside a repository.\n",
+        "- `hf_hub_download()`: Downloads an individual file from a repository.\n",
+        "- `snapshot_download()`: Downloads an entire repository snapshot.\n",
+        "- `login()`: Authenticates with Hugging Face when necessary.\n",
+        "\n",
+        "## Basic workflow\n",
+        "\n",
+        "1. Import HfApi.\n",
+        "2. Create an API client.\n",
+        "3. Provide a model repository ID.\n",
+        "4. Call the appropriate API method.\n",
+        "5. Inspect the returned information.\n",
+        "\n",
+        "**Important:** Most public Hub repositories can be inspected without authentication. Private and gated repositories require appropriate access permissions.\n",
+        ":::Code cell 1 — Install and import"
+      ],
+      "metadata": {
+        "id": "TMGRpa5jiBAL"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "!pip install -q -U huggingface_hub transformers"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "u8EWtyA3iPMq",
+        "outputId": "58de4841-ae0b-4f48-b08a-8c01e348f444"
+      },
+      "execution_count": 4,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\u001b[31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.\n",
+            "datasets 4.8.5 requires huggingface-hub<2.0,>=0.25.0, but you have huggingface-hub 2.4.0 which is incompatible.\u001b[0m\u001b[31m\n",
+            "\u001b[0m"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from huggingface_hub import (\n",
+        "    HfApi,\n",
+        "    hf_hub_download,\n",
+        "    snapshot_download\n",
+        ")\n",
+        "\n",
+        "from transformers import AutoConfig\n",
+        "\n",
+        "import json\n",
+        "import os\n",
+        "\n",
+        "print(\"Libraries imported successfully!\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "JRVoEJeRid4C",
+        "outputId": "e4a24bfb-6d18-4e8a-c2e9-0f26a2a2886e"
+      },
+      "execution_count": 5,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Libraries imported successfully!\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Explanation\n",
+        "- HfApi: Used to search and inspect repositories.\n",
+        "- hf_hub_download: Used to download individual files.\n",
+        "- snapshot_download: Used to download complete repository snapshots.\n",
+        "- AutoConfig: Used to load model architecture configurations.\n",
+        "- json: Used to inspect downloaded JSON configuration files.\n",
+        "- os: Used for file and directory operations.\n",
+        "We import these once at the beginning of the notebook.\n",
+        "Code cell 2 — Initialize the API client"
+      ],
+      "metadata": {
+        "id": "bHMH8hUsiiKT"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "api = HfApi()\n",
+        "print(type(api))"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "r9FIx4jKij05",
+        "outputId": "76a8e5f5-ffd5-4f30-d24e-3f4b7111654e"
+      },
+      "execution_count": 8,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "<class 'huggingface_hub.hf_api.HfApi'>\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Explanation\n",
+        "HfApi() creates an API client.\n",
+        "\n",
+        "Think of it as creating an object through which we can communicate with the Hugging Face Hub.\n",
+        "\n",
+        "We can now call:\n",
+        "api.model_info(...)api.list_models(...)api.list_repo_files(...)\n",
+        "\n",
+        "\n",
+        "We don't need to create a new API client every time we inspect a model."
+      ],
+      "metadata": {
+        "id": "dKz6HHXdixk7"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 4. Searching for Models\n",
+        "\n",
+        "Hugging Face provides model-search functionality through `HfApi.list_models()`.\n",
+        "\n",
+        "It allows us to discover models based on:\n",
+        "\n",
+        "- Task or pipeline type\n",
+        "- Organization or author\n",
+        "- Search keywords\n",
+        "- Download counts\n",
+        "- Likes\n",
+        "- Model library\n",
+        "- Other available filters\n",
+        "\n",
+        "Important parameters:\n",
+        "\n",
+        "- `filter`: Filters models by supported task or tags.\n",
+        "- `author`: Filters by model publisher.\n",
+        "- `search`: Searches model names and descriptions.\n",
+        "- `sort`: Specifies the field used for sorting.\n",
+        "- `direction`: Controls ascending or descending order.\n",
+        "- `limit`: Limits the number of returned models.\n",
+        "\n",
+        "Example:\n",
+        "\n",
+        "Searching for popular text-generation models and sorting by downloads.\n",
+        "\n",
+        "**Important:** Search ranking does not determine whether a model is suitable for your project. Always inspect its architecture, license, size, and requirements.\n"
+      ],
+      "metadata": {
+        "id": "FU0VsYhkjRXm"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "models = api.list_models(\n",
+        "    filter=\"text-generation\",\n",
+        "    sort=\"downloads\",\n",
+        "    limit=10\n",
+        ")\n",
+        "\n",
+        "for model in models:\n",
+        "    print(\n",
+        "        \"models :\", model.modelId,\n",
+        "        \"downloads :\", model.downloads,\n",
+        "        \"likes :\", model.likes\n",
+        "    )"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "maOCsIw_iyks",
+        "outputId": "7d3c4056-4d95-4352-c006-9219ae9a9f90"
+      },
+      "execution_count": 10,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "models : openai-community/gpt2 downloads : 34394889 likes : 3957\n",
+            "models : Qwen/Qwen3-0.6B downloads : 15392833 likes : 1922\n",
+            "models : Qwen/Qwen3-14B downloads : 13163564 likes : 551\n",
+            "models : deepseek-ai/DeepSeek-V3.2 downloads : 10436104 likes : 1608\n",
+            "models : Qwen/Qwen3-Embedding-0.6B downloads : 7566974 likes : 1357\n",
+            "models : Qwen/Qwen2.5-7B-Instruct downloads : 6391398 likes : 2505\n",
+            "models : Qwen/Qwen3-8B downloads : 6141295 likes : 2210\n",
+            "models : ornith-ai/Ornith-1.5-9B-GGUF downloads : 5741107 likes : 761\n",
+            "models : openai/gpt-oss-20b downloads : 5560822 likes : 5333\n",
+            "models : Qwen/Qwen2.5-1.5B-Instruct downloads : 4885950 likes : 950\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Explanation\n",
+        "Let's understand each argument.\n",
+        "Argument\tExplanation\n",
+        "filter\tSelects models matching a task or tag\n",
+        "sort\tSelects the sorting field\n",
+        "direction=-1\tDescending order\n",
+        "limit=10\tReturns up to 10 results\n",
+        "\n",
+        "\n",
+        "The function returns an iterable of model metadata objects.\n",
+        "\n",
+        "Notice that we are not downloading model weights here. We are only retrieving model information."
+      ],
+      "metadata": {
+        "id": "MY1-STZTkarC"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "models = api.list_models(\n",
+        "    search = \"llama\",\n",
+        "    limit = 10\n",
+        ")\n",
+        "\n",
+        "for model in models:\n",
+        "    print(\n",
+        "        \"models :\", model.modelId,\n",
+        "        \"downloads :\", model.downloads,\n",
+        "        \"likes :\", model.likes\n",
+        "    )\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "4QdQcNOQkdqJ",
+        "outputId": "b1dd91e7-7944-4de9-d0ca-4277fda56e5b"
+      },
+      "execution_count": 12,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "models : meta-llama/Meta-Llama-3-8B-Instruct downloads : 430110 likes : 6498\n",
+            "models : meta-llama/Llama-3.1-8B-Instruct downloads : 4097176 likes : 9053\n",
+            "models : meta-llama/Llama-3.1-8B downloads : 430059 likes : 2839\n",
+            "models : meta-llama/Llama-3.2-3B-Instruct downloads : 795292 likes : 3055\n",
+            "models : meta-llama/Llama-3.2-3B downloads : 316272 likes : 1115\n",
+            "models : meta-llama/Llama-3.2-1B-Instruct downloads : 1313379 likes : 2010\n",
+            "models : meta-llama/Llama-3.2-1B downloads : 655811 likes : 2797\n",
+            "models : kkt94/Llama-V-JEPA-LM-Qwen3-30B-A3B downloads : 41 likes : 12\n",
+            "models : meta-llama/Llama-3.3-70B-Instruct downloads : 344109 likes : 3219\n",
+            "models : meta-llama/Llama-Prompt-Guard-2-86M downloads : 99107 likes : 402\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 5. Inspecting Model Information\n",
+        "\n",
+        "The `HfApi.model_info()` method retrieves metadata about a specific model repository.\n",
+        "\n",
+        "It returns a `ModelInfo` object.\n",
+        "\n",
+        "Important information available includes:\n",
+        "\n",
+        "- `modelId`: Full repository identifier.\n",
+        "- `pipeline_tag`: Associated task or pipeline.\n",
+        "- `downloads`: Download count.\n",
+        "- `likes`: Number of likes.\n",
+        "- `library_name`: Associated library, when available.\n",
+        "- `tags`: Repository tags.\n",
+        "- `gated`: Whether access is restricted.\n",
+        "- `private`: Whether the repository is private.\n",
+        "- `sha`: Commit revision identifier.\n",
+        "- `lastModified`: Last modification timestamp.\n",
+        "\n",
+        "## Why inspect a model first?\n",
+        "\n",
+        "Different models have different architectures, licenses, hardware requirements and supported tasks.\n",
+        "\n",
+        "Inspecting repository metadata helps us decide whether a model is suitable before downloading its weights.\n",
+        "\n",
+        "**Best practice:** Record the model's repository ID and commit SHA when building reproducible ML workflows."
+      ],
+      "metadata": {
+        "id": "-GqeUzeClKDl"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "model_id = \"Qwen/Qwen2.5-0.5B-Instruct\"\n",
+        "\n",
+        "info = api.model_info(model_id)\n",
+        "\n",
+        "print(\"Model ID:\", info.modelId)\n",
+        "print(\"Task:\", info.pipeline_tag)\n",
+        "print(\"Downloads:\", info.downloads)\n",
+        "print(\"Likes:\", info.likes)\n",
+        "print(\"Library:\", info.library_name)\n",
+        "print(\"Gated:\", info.gated)\n",
+        "print(\"Private:\", info.private)\n",
+        "print(\"Revision:\", info.sha)\n",
+        "print(\"Last Modified:\", info.lastModified)"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "yCbI0hHslzST",
+        "outputId": "588d7c48-cf2c-4f18-8732-de1575d8fbae"
+      },
+      "execution_count": 13,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Model ID: Qwen/Qwen2.5-0.5B-Instruct\n",
+            "Task: text-generation\n",
+            "Downloads: 4041057\n",
+            "Likes: 757\n",
+            "Library: transformers\n",
+            "Gated: False\n",
+            "Private: False\n",
+            "Revision: 7ae557604adf67be50417f59c2c2f167def9a775\n",
+            "Last Modified: 2024-09-25 12:32:56+00:00\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 6. Listing Repository Files\n",
+        "\n",
+        "Hugging Face repositories contain different files depending on the model architecture, tokenizer implementation and storage format.\n",
+        "\n",
+        "The `HfApi.list_repo_files()` method retrieves the filenames available inside a repository.\n",
+        "\n",
+        "Important parameters:\n",
+        "\n",
+        "- `repo_id`: Repository identifier.\n",
+        "- `repo_type`: Repository category, such as model, dataset or space.\n",
+        "- `revision`: Branch, tag or commit to inspect.\n",
+        "\n",
+        "For model repositories, the default repository type is generally `model`.\n",
+        "\n",
+        "## Common model repository files\n",
+        "\n",
+        "- `config.json`: Model architecture configuration.\n",
+        "- `model.safetensors`: Model weights, when stored in this format.\n",
+        "- `model.safetensors.index.json`: Weight-shard index for sharded models.\n",
+        "- `tokenizer.json`: Tokenizer data and configuration.\n",
+        "- `tokenizer_config.json`: Tokenizer settings.\n",
+        "- `special_tokens_map.json`: Special token mappings.\n",
+        "- `generation_config.json`: Generation defaults.\n",
+        "- `README.md`: Model card and documentation.\n",
+        "\n",
+        "Not every model contains every file.\n",
+        "\n",
+        "**Important:** Listing repository files does not download the actual model weights."
+      ],
+      "metadata": {
+        "id": "habfvIH9moRK"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "files = api.list_repo_files(\n",
+        "    repo_id=model_id,\n",
+        "    repo_type=\"model\"\n",
+        ")\n",
+        "\n",
+        "for file in files:\n",
+        "    print(file)"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "KHw1pShbmpI1",
+        "outputId": "a6668c25-7630-461c-e3ae-1fd8e771399c"
+      },
+      "execution_count": 14,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            ".gitattributes\n",
+            "LICENSE\n",
+            "README.md\n",
+            "config.json\n",
+            "generation_config.json\n",
+            "merges.txt\n",
+            "model.safetensors\n",
+            "tokenizer.json\n",
+            "tokenizer_config.json\n",
+            "vocab.json\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Let's filter the repository files."
+      ],
+      "metadata": {
+        "id": "bPRAlNienGYy"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "important_files = [\n",
+        "    \"config.json\",\n",
+        "    \"generation_config.json\",\n",
+        "    \"tokenizer.json\",\n",
+        "    \"tokenizer_config.json\",\n",
+        "    \"special_tokens_map.json\",\n",
+        "    \"README.md\"\n",
+        "]\n",
+        "\n",
+        "for files in important_files:\n",
+        "  if files in important_files:\n",
+        "    print(files)\n",
+        "  else:\n",
+        "    print(\"file not found\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "-OT2_41pnHZV",
+        "outputId": "3cd41c98-1d5e-4614-e8c5-f138e6411c38"
+      },
+      "execution_count": 15,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "config.json\n",
+            "generation_config.json\n",
+            "tokenizer.json\n",
+            "tokenizer_config.json\n",
+            "special_tokens_map.json\n",
+            "README.md\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 7. Downloading Individual Repository Files\n",
+        "\n",
+        "The Hugging Face Hub library provides `hf_hub_download()` to download an individual file from a repository.\n",
+        "\n",
+        "Important parameters:\n",
+        "\n",
+        "- `repo_id`: Repository identifier.\n",
+        "- `filename`: File to download.\n",
+        "- `revision`: Branch, tag or commit SHA.\n",
+        "- `local_dir`: Optional destination directory.\n",
+        "\n",
+        "The function returns the local filesystem path of the downloaded file.\n",
+        "\n",
+        "## Why use individual downloads?\n",
+        "\n",
+        "Sometimes we only need a model's configuration, tokenizer files or documentation.\n",
+        "\n",
+        "Downloading individual files avoids downloading unnecessary model weights.\n",
+        "\n",
+        "The Hub library also maintains a local cache, which helps avoid repeated downloads of unchanged files.\n",
+        "\n",
+        "**Important distinction:**\n",
+        "\n",
+        "- `hf_hub_download()` downloads an individual file.\n",
+        "- `snapshot_download()` downloads a repository snapshot, potentially including model weights.\n"
+      ],
+      "metadata": {
+        "id": "IKdFazq4pf-8"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "config_path = hf_hub_download(\n",
+        "    repo_id=model_id,\n",
+        "    filename=\"config.json\",\n",
+        "    revision=info.sha\n",
+        ")\n",
+        "\n",
+        "print(\"Downloaded file:\", config_path)"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 124,
+          "referenced_widgets": [
+            "2b8ea847f8df478b98f0bb2d00c7fb35",
+            "cd98fcbf345a492bb657ceb29f22eb27",
+            "ee67e3199e0344faa985f6f9f27234a3",
+            "d168e87057484cb88e64d9ece7fc2697",
+            "fc6d40b08f5e4b02aa38b8d44aadcda1",
+            "47785f1bd6f5438fbe358732958b5610",
+            "20bad3fd337a4522a88739e1371c2775",
+            "69bb6a7239154692a237aac34343e235",
+            "8d18df7301b64898bc39480f06035d15",
+            "7b92d79874a3481f8466813ba86adf53",
+            "e7fb3b46fed94ebe9b0581a27406b0f2"
+          ]
+        },
+        "id": "6zxJU-unpvHD",
+        "outputId": "da08f532-0226-43ce-d77d-73fa13d2e545"
+      },
+      "execution_count": 16,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n",
+            "WARNING:huggingface_hub.utils._http:Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"
+          ]
+        },
+        {
+          "output_type": "display_data",
+          "data": {
+            "text/plain": [
+              "config.json:   0%|          | 0.00/659 [00:00<?, ?B/s]"
+            ],
+            "application/vnd.jupyter.widget-view+json": {
+              "version_major": 2,
+              "version_minor": 0,
+              "model_id": "2b8ea847f8df478b98f0bb2d00c7fb35"
+            }
+          },
+          "metadata": {}
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Downloaded file: /root/.cache/huggingface/hub/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775/config.json\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Explanation\n",
+        "Let's understand this:\n",
+        "repo_id=model_id\n",
+        "\n",
+        "\n",
+        "Specifies which repository to access.\n",
+        "filename=\"config.json\"\n",
+        "\n",
+        "\n",
+        "Specifies the exact file we want.\n",
+        "revision=info.sha\n",
+        "\n",
+        "\n",
+        "Specifies the exact repository commit.\n",
+        "\n",
+        "Why use the commit SHA?\n",
+        "\n",
+        "Imagine the model publisher updates the repository tomorrow.\n",
+        "\n",
+        "If we always load the latest version, our results might change.\n",
+        "\n",
+        "By specifying a commit SHA, we can access the same repository version again.\n",
+        "\n",
+        "This is called reproducibility."
+      ],
+      "metadata": {
+        "id": "jm0yx_haqlHu"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "with open(config_path, \"r\") as file:\n",
+        "    config_data = json.load(file)\n",
+        "\n",
+        "print(json.dumps(config_data, indent=4))"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "V98CcJ1Pqk3e",
+        "outputId": "e93579b0-b53f-435d-f2ff-b8fa0d5e2a4f"
+      },
+      "execution_count": 18,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "{\n",
+            "    \"architectures\": [\n",
+            "        \"Qwen2ForCausalLM\"\n",
+            "    ],\n",
+            "    \"attention_dropout\": 0.0,\n",
+            "    \"bos_token_id\": 151643,\n",
+            "    \"eos_token_id\": 151645,\n",
+            "    \"hidden_act\": \"silu\",\n",
+            "    \"hidden_size\": 896,\n",
+            "    \"initializer_range\": 0.02,\n",
+            "    \"intermediate_size\": 4864,\n",
+            "    \"max_position_embeddings\": 32768,\n",
+            "    \"max_window_layers\": 21,\n",
+            "    \"model_type\": \"qwen2\",\n",
+            "    \"num_attention_heads\": 14,\n",
+            "    \"num_hidden_layers\": 24,\n",
+            "    \"num_key_value_heads\": 2,\n",
+            "    \"rms_norm_eps\": 1e-06,\n",
+            "    \"rope_theta\": 1000000.0,\n",
+            "    \"sliding_window\": 32768,\n",
+            "    \"tie_word_embeddings\": true,\n",
+            "    \"torch_dtype\": \"bfloat16\",\n",
+            "    \"transformers_version\": \"4.43.1\",\n",
+            "    \"use_cache\": true,\n",
+            "    \"use_sliding_window\": false,\n",
+            "    \"vocab_size\": 151936\n",
+            "}\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 8. Understanding Model Architecture Using AutoConfig\n",
+        "\n",
+        "`AutoConfig` is a Hugging Face Transformers class that automatically identifies the appropriate model configuration class based on the repository's configuration.\n",
+        "\n",
+        "It allows us to inspect different model architectures using a common interface.\n",
+        "\n",
+        "## Main method\n",
+        "\n",
+        "`AutoConfig.from_pretrained()`\n",
+        "\n",
+        "Important parameters:\n",
+        "\n",
+        "- `pretrained_model_name_or_path`: Model repository ID or local directory.\n",
+        "- `revision`: Specific repository version.\n",
+        "- `trust_remote_code`: Whether to allow custom repository code.\n",
+        "- `cache_dir`: Optional custom cache location.\n",
+        "\n",
+        "## Important configuration attributes\n",
+        "\n",
+        "Depending on the architecture, configuration objects may contain:\n",
+        "\n",
+        "- `model_type`: Model architecture family.\n",
+        "- `architectures`: Associated model architecture class names.\n",
+        "- `hidden_size`: Hidden representation dimension.\n",
+        "- `num_hidden_layers`: Number of transformer layers.\n",
+        "- `num_attention_heads`: Number of attention heads.\n",
+        "- `num_key_value_heads`: Number of key-value heads, when applicable.\n",
+        "- `vocab_size`: Vocabulary size.\n",
+        "- `max_position_embeddings`: Maximum position embedding capacity, when applicable.\n",
+        "- `is_encoder_decoder`: Whether the architecture uses an encoder-decoder structure.\n",
+        "\n",
+        "## Why AutoConfig is important\n",
+        "\n",
+        "It allows us to discover model architecture information before loading the actual weights.\n",
+        "\n",
+        "This is useful for:\n",
+        "\n",
+        "1. Model selection.\n",
+        "2. Hardware planning.\n",
+        "3. Architecture discovery.\n",
+        "4. Model compatibility checks.\n",
+        "5. Building reusable model-loading pipelines.\n",
+        "\n",
+        "**Important:** Not every architecture uses the same configuration attributes. Always check whether an attribute exists before accessing it."
+      ],
+      "metadata": {
+        "id": "1-s54w-ur64N"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "config = AutoConfig.from_pretrained(\n",
+        "    model_id,\n",
+        "    revision=info.sha,\n",
+        "    trust_remote_code=False\n",
+        ")\n",
+        "\n",
+        "print(config)"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "zL2w1aoLr73z",
+        "outputId": "fec9ea04-4b70-423c-f8af-8df428abe908"
+      },
+      "execution_count": 19,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Qwen2Config {\n",
+            "  \"architectures\": [\n",
+            "    \"Qwen2ForCausalLM\"\n",
+            "  ],\n",
+            "  \"attention_dropout\": 0.0,\n",
+            "  \"bos_token_id\": 151643,\n",
+            "  \"dtype\": \"bfloat16\",\n",
+            "  \"eos_token_id\": 151645,\n",
+            "  \"hidden_act\": \"silu\",\n",
+            "  \"hidden_size\": 896,\n",
+            "  \"initializer_range\": 0.02,\n",
+            "  \"intermediate_size\": 4864,\n",
+            "  \"layer_types\": [\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\",\n",
+            "    \"full_attention\"\n",
+            "  ],\n",
+            "  \"max_position_embeddings\": 32768,\n",
+            "  \"max_window_layers\": 21,\n",
+            "  \"model_type\": \"qwen2\",\n",
+            "  \"num_attention_heads\": 14,\n",
+            "  \"num_hidden_layers\": 24,\n",
+            "  \"num_key_value_heads\": 2,\n",
+            "  \"pad_token_id\": null,\n",
+            "  \"rms_norm_eps\": 1e-06,\n",
+            "  \"rope_parameters\": {\n",
+            "    \"rope_theta\": 1000000.0,\n",
+            "    \"rope_type\": \"default\"\n",
+            "  },\n",
+            "  \"sliding_window\": null,\n",
+            "  \"tie_word_embeddings\": true,\n",
+            "  \"transformers_version\": \"5.23.0\",\n",
+            "  \"use_cache\": true,\n",
+            "  \"use_sliding_window\": false,\n",
+            "  \"vocab_size\": 151936\n",
+            "}\n",
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 9. Model Cards and Model Metadata\n",
+        "\n",
+        "A model card is documentation associated with a Hugging Face model repository.\n",
+        "\n",
+        "It provides information about the model's intended purpose, training methodology, limitations and usage.\n",
+        "\n",
+        "## Important information to inspect\n",
+        "\n",
+        "1. Model architecture.\n",
+        "2. Model size and parameter count.\n",
+        "3. Supported tasks.\n",
+        "4. Training data and methodology.\n",
+        "5. License and usage restrictions.\n",
+        "6. Intended applications.\n",
+        "7. Known limitations.\n",
+        "8. Recommended inference settings.\n",
+        "\n",
+        "## Why model cards matter\n",
+        "\n",
+        "A model's technical compatibility does not automatically mean it is legally or practically suitable for a project.\n",
+        "\n",
+        "Before using a model, verify:\n",
+        "\n",
+        "- Whether its license permits your intended usage.\n",
+        "- Whether commercial usage is allowed, if relevant.\n",
+        "- Whether the model is gated.\n",
+        "- Whether the model is suitable for your target task.\n",
+        "- Whether its limitations create risks for your application.\n",
+        "\n",
+        "**Best practice:** Treat the model card as part of the model-selection process, not optional reading.\n",
+        ":::For our selected model:\n",
+        "\n",
+        "Open Qwen2.5-0.5B-Instruct model repository\n",
+        "\n",
+        "Read its README and inspect its configuration."
+      ],
+      "metadata": {
+        "id": "ns0poa0wvovT"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from huggingface_hub import HfApi\n",
+        "from transformers import AutoConfig\n",
+        "\n",
+        "api = HfApi()\n",
+        "\n",
+        "def inspect_model(repo_id):\n",
+        "\n",
+        "    print(\"=\" * 60)\n",
+        "    print(\"MODEL INSPECTION\")\n",
+        "    print(\"=\" * 60)\n",
+        "\n",
+        "    # 1. Fetch repository information\n",
+        "\n",
+        "    info = api.model_info(repo_id)\n",
+        "\n",
+        "    print(\"\\nMODEL INFORMATION\")\n",
+        "\n",
+        "    print(\"Repository:\", info.modelId)\n",
+        "    print(\"Task:\", info.pipeline_tag)\n",
+        "    print(\"Downloads:\", info.downloads)\n",
+        "    print(\"Likes:\", info.likes)\n",
+        "    print(\"Library:\", info.library_name)\n",
+        "    print(\"Gated:\", info.gated)\n",
+        "    print(\"Revision:\", info.sha)\n",
+        "\n",
+        "    # 2. List repository files\n",
+        "\n",
+        "    files = api.list_repo_files(\n",
+        "        repo_id=repo_id,\n",
+        "        repo_type=\"model\",\n",
+        "        revision=info.sha\n",
+        "    )\n",
+        "\n",
+        "    print(\"\\nREPOSITORY FILES\")\n",
+        "\n",
+        "    for file in files:\n",
+        "        print(file)\n",
+        "\n",
+        "    # 3. Load architecture configuration\n",
+        "\n",
+        "    config = AutoConfig.from_pretrained(\n",
+        "        repo_id,\n",
+        "        revision=info.sha,\n",
+        "        trust_remote_code=False\n",
+        "    )\n",
+        "\n",
+        "    print(\"\\nARCHITECTURE INFORMATION\")\n",
+        "\n",
+        "    print(\"Model Type:\", config.model_type)\n",
+        "\n",
+        "    print(\n",
+        "        \"Architecture:\",\n",
+        "        getattr(config, \"architectures\", None)\n",
+        "    )\n",
+        "\n",
+        "    print(\n",
+        "        \"Hidden Size:\",\n",
+        "        get_config_value(\n",
+        "            config,\n",
+        "            \"hidden_size\",\n",
+        "            \"n_embd\",\n",
+        "            \"d_model\"\n",
+        "        )\n",
+        "    )\n",
+        "\n",
+        "    print(\n",
+        "        \"Layers:\",\n",
+        "        get_config_value(\n",
+        "            config,\n",
+        "            \"num_hidden_layers\",\n",
+        "            \"n_layer\",\n",
+        "            \"num_layers\"\n",
+        "        )\n",
+        "    )\n",
+        "\n",
+        "    print(\n",
+        "        \"Attention Heads:\",\n",
+        "        get_config_value(\n",
+        "            config,\n",
+        "            \"num_attention_heads\",\n",
+        "            \"n_head\",\n",
+        "            \"num_heads\"\n",
+        "        )\n",
+        "    )\n",
+        "\n",
+        "    print(\n",
+        "        \"Vocabulary:\",\n",
+        "        getattr(config, \"vocab_size\", None)\n",
+        "    )\n",
+        "\n",
+        "    print(\n",
+        "        \"Encoder Decoder:\",\n",
+        "        getattr(config, \"is_encoder_decoder\", None)\n",
+        "    )\n",
+        "\n",
+        "    print(\"\\nINSPECTION COMPLETED\")\n",
+        "\n",
+        "    return {\n",
+        "        \"info\": info,\n",
+        "        \"files\": files,\n",
+        "        \"config\": config,\n",
+        "        \"revision\": info.sha\n",
+        "    }"
+      ],
+      "metadata": {
+        "id": "R9M9h2vQvzIb"
+      },
+      "execution_count": 21,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def get_config_value(config, *keys):\n",
+        "    for key in keys:\n",
+        "        if hasattr(config, key):\n",
+        "            return getattr(config, key)\n",
+        "    return None\n",
+        "\n",
+        "model_data = inspect_model(\n",
+        "    \"Qwen/Qwen2.5-0.5B-Instruct\"\n",
+        ")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "NT5Sl-xhv4IK",
+        "outputId": "bf3c6d0c-38b5-4b81-a1d3-1ec10503eb90"
+      },
+      "execution_count": 23,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "============================================================\n",
+            "MODEL INSPECTION\n",
+            "============================================================\n",
+            "\n",
+            "MODEL INFORMATION\n",
+            "Repository: Qwen/Qwen2.5-0.5B-Instruct\n",
+            "Task: text-generation\n",
+            "Downloads: 4041057\n",
+            "Likes: 757\n",
+            "Library: transformers\n",
+            "Gated: False\n",
+            "Revision: 7ae557604adf67be50417f59c2c2f167def9a775\n",
+            "\n",
+            "REPOSITORY FILES\n",
+            ".gitattributes\n",
+            "LICENSE\n",
+            "README.md\n",
+            "config.json\n",
+            "generation_config.json\n",
+            "merges.txt\n",
+            "model.safetensors\n",
+            "tokenizer.json\n",
+            "tokenizer_config.json\n",
+            "vocab.json\n",
+            "\n",
+            "ARCHITECTURE INFORMATION\n",
+            "Model Type: qwen2\n",
+            "Architecture: ['Qwen2ForCausalLM']\n",
+            "Hidden Size: 896\n",
+            "Layers: 24\n",
+            "Attention Heads: 14\n",
+            "Vocabulary: 151936\n",
+            "Encoder Decoder: False\n",
+            "\n",
+            "INSPECTION COMPLETED\n"
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "gpuType": "T4",
+      "include_colab_link": true
+    },
+    "accelerator": "GPU",
+    "language_info": {
+      "name": "python"
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "widgets": {
+      "application/vnd.jupyter.widget-state+json": {
+        "version_major": 2,
+        "version_minor": 0,
+        "state": {
+          "2b8ea847f8df478b98f0bb2d00c7fb35": {
+            "model_module": "@jupyter-widgets/controls",
+            "model_name": "HBoxModel",
+            "model_module_version": "1.5.0",
+            "state": {
+              "_dom_classes": [],
+              "_model_module": "@jupyter-widgets/controls",
+              "_model_module_version": "1.5.0",
+              "_model_name": "HBoxModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/controls",
+              "_view_module_version": "1.5.0",
+              "_view_name": "HBoxView",
+              "box_style": "",
+              "children": [
+                "IPY_MODEL_cd98fcbf345a492bb657ceb29f22eb27",
+                "IPY_MODEL_ee67e3199e0344faa985f6f9f27234a3",
+                "IPY_MODEL_d168e87057484cb88e64d9ece7fc2697"
+              ],
+              "layout": "IPY_MODEL_fc6d40b08f5e4b02aa38b8d44aadcda1"
+            }
+          },
+          "cd98fcbf345a492bb657ceb29f22eb27": {
+            "model_module": "@jupyter-widgets/controls",
+            "model_name": "HTMLModel",
+            "model_module_version": "1.5.0",
+            "state": {
+              "_dom_classes": [],
+              "_model_module": "@jupyter-widgets/controls",
+              "_model_module_version": "1.5.0",
+              "_model_name": "HTMLModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/controls",
+              "_view_module_version": "1.5.0",
+              "_view_name": "HTMLView",
+              "description": "",
+              "description_tooltip": null,
+              "layout": "IPY_MODEL_47785f1bd6f5438fbe358732958b5610",
+              "placeholder": "​",
+              "style": "IPY_MODEL_20bad3fd337a4522a88739e1371c2775",
+              "value": "config.json: 100%"
+            }
+          },
+          "ee67e3199e0344faa985f6f9f27234a3": {
+            "model_module": "@jupyter-widgets/controls",
+            "model_name": "FloatProgressModel",
+            "model_module_version": "1.5.0",
+            "state": {
+              "_dom_classes": [],
+              "_model_module": "@jupyter-widgets/controls",
+              "_model_module_version": "1.5.0",
+              "_model_name": "FloatProgressModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/controls",
+              "_view_module_version": "1.5.0",
+              "_view_name": "ProgressView",
+              "bar_style": "success",
+              "description": "",
+              "description_tooltip": null,
+              "layout": "IPY_MODEL_69bb6a7239154692a237aac34343e235",
+              "max": 659,
+              "min": 0,
+              "orientation": "horizontal",
+              "style": "IPY_MODEL_8d18df7301b64898bc39480f06035d15",
+              "value": 659
+            }
+          },
+          "d168e87057484cb88e64d9ece7fc2697": {
+            "model_module": "@jupyter-widgets/controls",
+            "model_name": "HTMLModel",
+            "model_module_version": "1.5.0",
+            "state": {
+              "_dom_classes": [],
+              "_model_module": "@jupyter-widgets/controls",
+              "_model_module_version": "1.5.0",
+              "_model_name": "HTMLModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/controls",
+              "_view_module_version": "1.5.0",
+              "_view_name": "HTMLView",
+              "description": "",
+              "description_tooltip": null,
+              "layout": "IPY_MODEL_7b92d79874a3481f8466813ba86adf53",
+              "placeholder": "​",
+              "style": "IPY_MODEL_e7fb3b46fed94ebe9b0581a27406b0f2",
+              "value": " 659/659 [00:00&lt;00:00, 27.1kB/s]"
+            }
+          },
+          "fc6d40b08f5e4b02aa38b8d44aadcda1": {
+            "model_module": "@jupyter-widgets/base",
+            "model_name": "LayoutModel",
+            "model_module_version": "1.2.0",
+            "state": {
+              "_model_module": "@jupyter-widgets/base",
+              "_model_module_version": "1.2.0",
+              "_model_name": "LayoutModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/base",
+              "_view_module_version": "1.2.0",
+              "_view_name": "LayoutView",
+              "align_content": null,
+              "align_items": null,
+              "align_self": null,
+              "border": null,
+              "bottom": null,
+              "display": null,
+              "flex": null,
+              "flex_flow": null,
+              "grid_area": null,
+              "grid_auto_columns": null,
+              "grid_auto_flow": null,
+              "grid_auto_rows": null,
+              "grid_column": null,
+              "grid_gap": null,
+              "grid_row": null,
+              "grid_template_areas": null,
+              "grid_template_columns": null,
+              "grid_template_rows": null,
+              "height": null,
+              "justify_content": null,
+              "justify_items": null,
+              "left": null,
+              "margin": null,
+              "max_height": null,
+              "max_width": null,
+              "min_height": null,
+              "min_width": null,
+              "object_fit": null,
+              "object_position": null,
+              "order": null,
+              "overflow": null,
+              "overflow_x": null,
+              "overflow_y": null,
+              "padding": null,
+              "right": null,
+              "top": null,
+              "visibility": null,
+              "width": null
+            }
+          },
+          "47785f1bd6f5438fbe358732958b5610": {
+            "model_module": "@jupyter-widgets/base",
+            "model_name": "LayoutModel",
+            "model_module_version": "1.2.0",
+            "state": {
+              "_model_module": "@jupyter-widgets/base",
+              "_model_module_version": "1.2.0",
+              "_model_name": "LayoutModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/base",
+              "_view_module_version": "1.2.0",
+              "_view_name": "LayoutView",
+              "align_content": null,
+              "align_items": null,
+              "align_self": null,
+              "border": null,
+              "bottom": null,
+              "display": null,
+              "flex": null,
+              "flex_flow": null,
+              "grid_area": null,
+              "grid_auto_columns": null,
+              "grid_auto_flow": null,
+              "grid_auto_rows": null,
+              "grid_column": null,
+              "grid_gap": null,
+              "grid_row": null,
+              "grid_template_areas": null,
+              "grid_template_columns": null,
+              "grid_template_rows": null,
+              "height": null,
+              "justify_content": null,
+              "justify_items": null,
+              "left": null,
+              "margin": null,
+              "max_height": null,
+              "max_width": null,
+              "min_height": null,
+              "min_width": null,
+              "object_fit": null,
+              "object_position": null,
+              "order": null,
+              "overflow": null,
+              "overflow_x": null,
+              "overflow_y": null,
+              "padding": null,
+              "right": null,
+              "top": null,
+              "visibility": null,
+              "width": null
+            }
+          },
+          "20bad3fd337a4522a88739e1371c2775": {
+            "model_module": "@jupyter-widgets/controls",
+            "model_name": "DescriptionStyleModel",
+            "model_module_version": "1.5.0",
+            "state": {
+              "_model_module": "@jupyter-widgets/controls",
+              "_model_module_version": "1.5.0",
+              "_model_name": "DescriptionStyleModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/base",
+              "_view_module_version": "1.2.0",
+              "_view_name": "StyleView",
+              "description_width": ""
+            }
+          },
+          "69bb6a7239154692a237aac34343e235": {
+            "model_module": "@jupyter-widgets/base",
+            "model_name": "LayoutModel",
+            "model_module_version": "1.2.0",
+            "state": {
+              "_model_module": "@jupyter-widgets/base",
+              "_model_module_version": "1.2.0",
+              "_model_name": "LayoutModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/base",
+              "_view_module_version": "1.2.0",
+              "_view_name": "LayoutView",
+              "align_content": null,
+              "align_items": null,
+              "align_self": null,
+              "border": null,
+              "bottom": null,
+              "display": null,
+              "flex": null,
+              "flex_flow": null,
+              "grid_area": null,
+              "grid_auto_columns": null,
+              "grid_auto_flow": null,
+              "grid_auto_rows": null,
+              "grid_column": null,
+              "grid_gap": null,
+              "grid_row": null,
+              "grid_template_areas": null,
+              "grid_template_columns": null,
+              "grid_template_rows": null,
+              "height": null,
+              "justify_content": null,
+              "justify_items": null,
+              "left": null,
+              "margin": null,
+              "max_height": null,
+              "max_width": null,
+              "min_height": null,
+              "min_width": null,
+              "object_fit": null,
+              "object_position": null,
+              "order": null,
+              "overflow": null,
+              "overflow_x": null,
+              "overflow_y": null,
+              "padding": null,
+              "right": null,
+              "top": null,
+              "visibility": null,
+              "width": null
+            }
+          },
+          "8d18df7301b64898bc39480f06035d15": {
+            "model_module": "@jupyter-widgets/controls",
+            "model_name": "ProgressStyleModel",
+            "model_module_version": "1.5.0",
+            "state": {
+              "_model_module": "@jupyter-widgets/controls",
+              "_model_module_version": "1.5.0",
+              "_model_name": "ProgressStyleModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/base",
+              "_view_module_version": "1.2.0",
+              "_view_name": "StyleView",
+              "bar_color": null,
+              "description_width": ""
+            }
+          },
+          "7b92d79874a3481f8466813ba86adf53": {
+            "model_module": "@jupyter-widgets/base",
+            "model_name": "LayoutModel",
+            "model_module_version": "1.2.0",
+            "state": {
+              "_model_module": "@jupyter-widgets/base",
+              "_model_module_version": "1.2.0",
+              "_model_name": "LayoutModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/base",
+              "_view_module_version": "1.2.0",
+              "_view_name": "LayoutView",
+              "align_content": null,
+              "align_items": null,
+              "align_self": null,
+              "border": null,
+              "bottom": null,
+              "display": null,
+              "flex": null,
+              "flex_flow": null,
+              "grid_area": null,
+              "grid_auto_columns": null,
+              "grid_auto_flow": null,
+              "grid_auto_rows": null,
+              "grid_column": null,
+              "grid_gap": null,
+              "grid_row": null,
+              "grid_template_areas": null,
+              "grid_template_columns": null,
+              "grid_template_rows": null,
+              "height": null,
+              "justify_content": null,
+              "justify_items": null,
+              "left": null,
+              "margin": null,
+              "max_height": null,
+              "max_width": null,
+              "min_height": null,
+              "min_width": null,
+              "object_fit": null,
+              "object_position": null,
+              "order": null,
+              "overflow": null,
+              "overflow_x": null,
+              "overflow_y": null,
+              "padding": null,
+              "right": null,
+              "top": null,
+              "visibility": null,
+              "width": null
+            }
+          },
+          "e7fb3b46fed94ebe9b0581a27406b0f2": {
+            "model_module": "@jupyter-widgets/controls",
+            "model_name": "DescriptionStyleModel",
+            "model_module_version": "1.5.0",
+            "state": {
+              "_model_module": "@jupyter-widgets/controls",
+              "_model_module_version": "1.5.0",
+              "_model_name": "DescriptionStyleModel",
+              "_view_count": null,
+              "_view_module": "@jupyter-widgets/base",
+              "_view_module_version": "1.2.0",
+              "_view_name": "StyleView",
+              "description_width": ""
+            }
+          }
+        }
+      }
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}
